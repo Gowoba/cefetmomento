@@ -90,6 +90,8 @@ const quizzes = {
 };
 
 let currentQuestion = null;
+let answeredQuestions = []; // Lista de perguntas já respondidas
+let correctAnswers = 0; // Contador de respostas corretas
 
 function updateContent() {
     const professor = document.getElementById("professor-select").value;
@@ -98,76 +100,66 @@ function updateContent() {
     // Limpa o conteúdo atual
     quizDiv.innerHTML = "";
 
-    if (professor === "all") {
-        // Exibe as questões de todos os professores de POO
-        currentQuestion = getRandomQuestionFromAllPOO();
+    const allQuestions = professor === "all" 
+        ? getAllPOOQuestions() 
+        : quizzes.poo[professor] || [];
 
-        const questionElem = document.createElement("div");
-        questionElem.classList.add("question");
-
-        // Embaralha as alternativas antes de exibir
-        const shuffledChoices = shuffleArray(currentQuestion.choices);
-
-        questionElem.innerHTML = `
-            <p>${currentQuestion.question}</p>
-            ${shuffledChoices.map((choice, index) => `
-                <div>
-                    <input type="radio" name="answer" id="answer-${index}" value="${choice}">
-                    <label for="answer-${index}">${choice}</label>
-                </div>
-            `).join('')}
+    // Verifica se todas as perguntas foram respondidas
+    if (answeredQuestions.length === allQuestions.length) {
+        quizDiv.innerHTML = `
+            <p>Você respondeu todas as perguntas!</p>
+            <p>Total de acertos: ${correctAnswers} de ${allQuestions.length}</p>
+            <button onclick="resetQuiz()">Refazer Quiz</button>
         `;
-
-        quizDiv.appendChild(questionElem);
-
-        const submitButton = document.createElement("button");
-        submitButton.textContent = "Enviar Resposta";
-        submitButton.onclick = () => checkAnswer("poo");
-        quizDiv.appendChild(submitButton);
-    } else if (quizzes.poo[professor]) {
-        // Exibe o quiz do professor selecionado de POO
-        currentQuestion = getRandomQuestion(quizzes.poo[professor]);
-
-        const questionElem = document.createElement("div");
-        questionElem.classList.add("question");
-
-        const shuffledChoices = shuffleArray(currentQuestion.choices);
-
-        questionElem.innerHTML = `
-            <p>${currentQuestion.question}</p>
-            ${shuffledChoices.map((choice, index) => `
-                <div>
-                    <input type="radio" name="answer" id="answer-${index}" value="${choice}">
-                    <label for="answer-${index}">${choice}</label>
-                </div>
-            `).join('')}
-        `;
-
-        quizDiv.appendChild(questionElem);
-
-        const submitButton = document.createElement("button");
-        submitButton.textContent = "Enviar Resposta";
-        submitButton.onclick = () => checkAnswer("poo");
-        quizDiv.appendChild(submitButton);
-    } else {
-        quizDiv.innerHTML = "<p>Selecione um professor para ver o quiz.</p>";
+        return;
     }
+
+    // Seleciona uma nova pergunta que ainda não foi respondida
+    currentQuestion = getRandomUnansweredQuestion(allQuestions);
+
+    if (!currentQuestion) {
+        quizDiv.innerHTML = "<p>Não há mais perguntas disponíveis.</p>";
+        return;
+    }
+
+    const questionElem = document.createElement("div");
+    questionElem.classList.add("question");
+
+    // Embaralha as alternativas antes de exibir
+    const shuffledChoices = shuffleArray(currentQuestion.choices);
+
+    questionElem.innerHTML = `
+        <p>${currentQuestion.question}</p>
+        ${shuffledChoices.map((choice, index) => `
+            <div>
+                <input type="radio" name="answer" id="answer-${index}" value="${choice}">
+                <label for="answer-${index}">${choice}</label>
+            </div>
+        `).join('')}
+    `;
+
+    quizDiv.appendChild(questionElem);
+
+    const submitButton = document.createElement("button");
+    submitButton.textContent = "Enviar Resposta";
+    submitButton.onclick = () => checkAnswer(allQuestions);
+    quizDiv.appendChild(submitButton);
 }
 
-function getRandomQuestionFromAllPOO() {
-    // Junta todas as perguntas de POO em uma lista
-    const allPOOQuestions = [
+function getAllPOOQuestions() {
+    return [
         ...quizzes.poo.professor1,
         ...quizzes.poo.professor2,
         ...quizzes.poo.professor3
     ];
-
-    return getRandomQuestion(allPOOQuestions);
 }
 
-function getRandomQuestion(quiz) {
-    const randomIndex = Math.floor(Math.random() * quiz.length);
-    return quiz[randomIndex];
+function getRandomUnansweredQuestion(questions) {
+    const unanswered = questions.filter(q => !answeredQuestions.includes(q));
+    if (unanswered.length === 0) return null;
+
+    const randomIndex = Math.floor(Math.random() * unanswered.length);
+    return unanswered[randomIndex];
 }
 
 function shuffleArray(array) {
@@ -178,7 +170,7 @@ function shuffleArray(array) {
     return array;
 }
 
-function checkAnswer(subject) {
+function checkAnswer(allQuestions) {
     const selectedAnswer = document.querySelector('input[name="answer"]:checked');
     const resultDiv = document.getElementById("result");
 
@@ -188,8 +180,14 @@ function checkAnswer(subject) {
     }
 
     const correct = selectedAnswer.value === currentQuestion.answer;
+
+    // Incrementa o contador de acertos se a resposta estiver correta
+    if (correct) {
+        correctAnswers++;
+    }
+
     const allChoices = document.querySelectorAll('input[name="answer"]');
-    
+
     allChoices.forEach((choice) => {
         const label = choice.nextElementSibling;
         if (choice.value === currentQuestion.answer) {
@@ -203,9 +201,18 @@ function checkAnswer(subject) {
         <h3>Resultado:</h3>
         <p>${correct ? "Resposta correta!" : "Resposta incorreta!"}</p>
     `;
-    
+
+    // Adiciona a pergunta atual à lista de respondidas
+    answeredQuestions.push(currentQuestion);
+
     setTimeout(() => {
         updateContent();
         resultDiv.innerHTML = "";
     }, 2000);
+}
+
+function resetQuiz() {
+    answeredQuestions = []; // Limpa a lista de respondidas
+    correctAnswers = 0; // Reinicia o contador de acertos
+    updateContent(); // Reinicia o quiz
 }
